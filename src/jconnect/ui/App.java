@@ -22,11 +22,10 @@ public class App extends JFrame implements ConnectionObserver {
 
     public App() {
         setTitle("JConnect P2P Messenger");
-        setSize(950, 650); // Slightly larger for modern feel
+        setSize(950, 650);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
-        // Use a container with padding for the main layout
         JPanel mainContainer = new JPanel(new BorderLayout(15, 15));
         mainContainer.setBorder(new EmptyBorder(15, 15, 15, 15)); // Global padding
         setContentPane(mainContainer);
@@ -45,7 +44,6 @@ public class App extends JFrame implements ConnectionObserver {
         deviceListModel = new DefaultListModel<>();
         deviceList = new JList<>(deviceListModel);
         deviceList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        // Modern list styling
         deviceList.setFixedCellHeight(35);
         deviceList.setFont(new Font("Segoe UI", Font.PLAIN, 14));
 
@@ -78,7 +76,6 @@ public class App extends JFrame implements ConnectionObserver {
     private void initRightPanel() {
         JPanel rightContainer = new JPanel(new BorderLayout(10, 10));
 
-        // Top Panel: Status + Progress
         JPanel topPanel = new JPanel(new BorderLayout());
         connectionStatusLabel = new JLabel("Select a device");
         connectionStatusLabel.setFont(new Font("Segoe UI", Font.BOLD, 18)); // Larger, modern font
@@ -86,25 +83,23 @@ public class App extends JFrame implements ConnectionObserver {
         progressBar = new JProgressBar(0, 100);
         progressBar.setStringPainted(true);
         progressBar.setVisible(false);
-        // Make progress bar thinner
         progressBar.setPreferredSize(new Dimension(100, 4));
 
         topPanel.add(connectionStatusLabel, BorderLayout.CENTER);
         topPanel.add(progressBar, BorderLayout.SOUTH);
 
-        // Center Panel: Chat
         chatArea = new JTextArea();
         chatArea.setEditable(false);
         chatArea.setLineWrap(true);
         chatArea.setWrapStyleWord(true);
         chatArea.setFont(new Font("Segoe UI", Font.PLAIN, 15)); // Readable font
-        // Add padding inside the text area
+
         chatArea.setBorder(new EmptyBorder(10, 10, 10, 10));
 
         JScrollPane chatScroll = new JScrollPane(chatArea);
         chatScroll.setBorder(BorderFactory.createLineBorder(UIManager.getColor("Component.borderColor"))); // Subtle border
 
-        // Bottom Panel: Input + File Button
+
         JPanel inputPanel = new JPanel(new BorderLayout(10, 0));
 
         messageField = new JTextField();
@@ -115,7 +110,6 @@ public class App extends JFrame implements ConnectionObserver {
         sendButton = new JButton("Send");
         sendFileButton = new JButton("File");
 
-        // Make buttons slightly larger/friendlier
         sendButton.setFocusPainted(false);
         sendFileButton.setFocusPainted(false);
 
@@ -206,15 +200,12 @@ public class App extends JFrame implements ConnectionObserver {
     }
 
     public static void main(String[] args) {
-        // 1. SETUP FLATLAF
         try {
             FlatDarkLaf.setup();
-
-            // Optional: Customize global settings
-            UIManager.put("Button.arc", 12);         // Rounded buttons
-            UIManager.put("Component.arc", 12);      // Rounded fields
-            UIManager.put("ProgressBar.arc", 12);    // Rounded progress bar
-            UIManager.put("ScrollBar.width", 10);    // Thinner scrollbars
+            UIManager.put("Button.arc", 12);
+            UIManager.put("Component.arc", 12);
+            UIManager.put("ProgressBar.arc", 12);
+            UIManager.put("ScrollBar.width", 10);
         } catch (Exception ex) {
             System.err.println("Failed to initialize FlatLaf");
         }
