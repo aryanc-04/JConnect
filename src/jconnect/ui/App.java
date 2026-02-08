@@ -6,93 +6,67 @@ import java.awt.*;
 import java.util.List;
 
 public class App extends JFrame implements ConnectionObserver {
-    private DefaultListModel<String> deviceListModel;
-    private JList<String> deviceList;
-    private JTextArea chatArea;
-    private JTextField messageField;
+    private DefaultListModel<String> deviceListModel = new DefaultListModel<>();
+    private JList<String> deviceList = new JList<>(deviceListModel);
+    private JTextArea chatArea = new JTextArea();
+    private JTextField messageField = new JTextField();
     private NetworkManager networkManager;
-    private String selectedDeviceIp = null;
+    private String selectedIp;
 
     public App() {
-        setTitle("JConnect P2P");
-        setSize(800, 600);
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setLayout(new BorderLayout(10, 10));
+        setTitle("JConnect P2P Messenger");
+        setSize(800, 500);
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setLayout(new BorderLayout(5, 5));
 
-        initComponents();
-        
-        // Initialize Network
+        // UI Setup
+        deviceList.addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) selectedIp = deviceList.getSelectedValue();
+        });
+        add(new JScrollPane(deviceList), BorderLayout.WEST);
+
+        chatArea.setEditable(false);
+        add(new JScrollPane(chatArea), BorderLayout.CENTER);
+
+        JPanel bottom = new JPanel(new BorderLayout());
+        bottom.add(messageField, BorderLayout.CENTER);
+        JButton sendBtn = new JButton("Send");
+        sendBtn.addActionListener(e -> send());
+        messageField.addActionListener(e -> send());
+        bottom.add(sendBtn, BorderLayout.EAST);
+        add(bottom, BorderLayout.SOUTH);
+
+        // Logic Initialization
         networkManager = new NetworkManager(this);
         networkManager.start();
 
-        // Start a UI timer to refresh the discovery list every 2 seconds
-        new Timer(2000, e -> refreshDeviceList()).start();
+        // Refresh Sidebar every 3 seconds
+        new Timer(3000, e -> {
+            List<String> online = DeviceRegistry.getOnlineDevices();
+            deviceListModel.clear();
+            for (String ip : online) deviceListModel.addElement(ip);
+        }).start();
 
         setVisible(true);
     }
 
-    private void initComponents() {
-        // Left Panel: Device List
-        deviceListModel = new DefaultListModel<>();
-        deviceList = new JList<>(deviceListModel);
-        deviceList.addListSelectionListener(e -> {
-            if (!e.getValueIsAdjusting()) {
-                selectedDeviceIp = deviceList.getSelectedValue();
-                setTitle("JConnect - Chatting with " + selectedDeviceIp);
-            }
-        });
-        add(new JScrollPane(deviceList), BorderLayout.WEST);
-
-        // Right Panel: Chat
-        JPanel chatPanel = new JPanel(new BorderLayout());
-        chatArea = new JTextArea();
-        chatArea.setEditable(false);
-        chatPanel.add(new JScrollPane(chatArea), BorderLayout.CENTER);
-
-        // Input Field
-        messageField = new JTextField();
-        messageField.addActionListener(e -> sendMessage());
-        JButton sendBtn = new JButton("Send");
-        sendBtn.addActionListener(e -> sendMessage());
-
-        JPanel inputPanel = new JPanel(new BorderLayout());
-        inputPanel.add(messageField, BorderLayout.CENTER);
-        inputPanel.add(sendBtn, BorderLayout.EAST);
-        chatPanel.add(inputPanel, BorderLayout.SOUTH);
-
-        add(chatPanel, BorderLayout.CENTER);
-    }
-
-    private void refreshDeviceList() {
-        List<String> online = DeviceRegistry.getOnlineDevices();
-        // Update list model without clearing selection
-        String current = selectedDeviceIp;
-        deviceListModel.clear();
-        for (String ip : online) deviceListModel.addElement(ip);
-        if (current != null) deviceList.setSelectedValue(current, true);
-    }
-
-    private void sendMessage() {
+    private void send() {
         String msg = messageField.getText();
-        if (selectedDeviceIp != null && !msg.isEmpty()) {
-            networkManager.sendMessageTo(selectedDeviceIp, msg);
+        if (selectedIp != null && !msg.isEmpty()) {
+            networkManager.sendMessageTo(selectedIp, msg);
             chatArea.append("Me: " + msg + "\n");
             messageField.setText("");
         }
     }
 
     @Override
-    public void onMessage(String ip, String message) {
-        SwingUtilities.invokeLater(() -> {
-            chatArea.append("[" + ip + "]: " + message + "\n");
-        });
+    public void onMessage(String ip, String msg) {
+        SwingUtilities.invokeLater(() -> chatArea.append("[" + ip + "]: " + msg + "\n"));
     }
 
     @Override
-    public void onStatusChange(String ip, boolean isOnline) {
-        SwingUtilities.invokeLater(() -> {
-            chatArea.append("System: " + ip + (isOnline ? " is online" : " went offline") + "\n");
-        });
+    public void onStatusChange(String ip, boolean online) {
+        SwingUtilities.invokeLater(() -> chatArea.append("SYSTEM: " + ip + (online ? " joined." : " left.") + "\n"));
     }
 
     public static void main(String[] args) {

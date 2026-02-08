@@ -9,49 +9,54 @@ public class NetworkManager implements ConnectionObserver {
     private final Map<String, DeviceConnection> activeConnections = new ConcurrentHashMap<>();
     private final ConnectionObserver uiObserver;
     private final DiscoveryService discoveryService;
+    private String myIp;
 
     public NetworkManager(ConnectionObserver uiObserver) {
         this.uiObserver = uiObserver;
         this.discoveryService = new DiscoveryService();
+        try {
+            this.myIp = InetAddress.getLocalHost().getHostAddress();
+        } catch (Exception e) { this.myIp = "127.0.0.1"; }
     }
 
     public void start() {
         discoveryService.start();
-        startServer();
+        new Thread(this::startServer).start();
     }
 
     private void startServer() {
-        new Thread(() -> {
-            try (ServerSocket ss = new ServerSocket(5000)) {
-                while (true) {
-                    Socket s = ss.accept();
-                    String ip = s.getInetAddress().getHostAddress();
-                    // Only create if we don't already have a valid connection
-                    DeviceConnection dc = new DeviceConnection(s, this);
-                    activeConnections.put(ip, dc);
+        try (ServerSocket ss = new ServerSocket(5000)) {
+            while (true) {
+                Socket s = ss.accept();
+                String partnerIp = s.getInetAddress().getHostAddress();
+                if (!activeConnections.containsKey(partnerIp)) {
+                    activeConnections.put(partnerIp, new DeviceConnection(s, this));
                 }
-            } catch (IOException e) { e.printStackTrace(); }
-        }).start();
+            }
+        } catch (IOException e) { e.printStackTrace(); }
     }
 
-    public void sendMessageTo(String ip, String message) {
-        DeviceConnection dc = activeConnections.get(ip);
-        if (dc == null) {
-            // If no connection exists, try to initiate one
-            dc = new DeviceConnection(ip, 5000, this);
-            activeConnections.put(ip, dc);
+    public void sendMessageTo(String targetIp, String message) {
+        if (!activeConnections.containsKey(targetIp)) {
+            // IP Priority Rule: Only connect if my IP is lexicographically 'higher'
+            if (myIp.compareTo(targetIp) > 0) {
+                DeviceConnection dc = new DeviceConnection(targetIp, 5000, this);
+                activeConnections.put(targetIp, dc);
+                dc.send(message);
+            } else {
+                uiObserver.onMessage("SYSTEM", "Waiting for " + targetIp + " to call first...");
+            }
+        } else {
+            activeConnections.get(targetIp).send(message);
         }
-        dc.send(message);
     }
 
     @Override
-    public void onMessage(String ip, String message) {
-        uiObserver.onMessage(ip, message);
-    }
+    public void onMessage(String ip, String msg) { uiObserver.onMessage(ip, msg); }
 
     @Override
-    public void onStatusChange(String ip, boolean isOnline) {
-        if (!isOnline) activeConnections.remove(ip);
-        uiObserver.onStatusChange(ip, isOnline);
+    public void onStatusChange(String ip, boolean online) {
+        if (!online) activeConnections.remove(ip);
+        uiObserver.onStatusChange(ip, online);
     }
 }
