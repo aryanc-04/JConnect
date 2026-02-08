@@ -37,18 +37,27 @@ public class NetworkManager implements ConnectionObserver {
     }
 
     public void sendMessageTo(String targetIp, String message) {
+        DeviceConnection conn = getConnection(targetIp);
+        if (conn != null) conn.sendText(message);
+    }
+    
+    public void sendFileTo(String targetIp, File file) {
+        DeviceConnection conn = getConnection(targetIp);
+        if (conn != null) conn.sendFile(file);
+    }
+
+    private DeviceConnection getConnection(String targetIp) {
         if (!activeConnections.containsKey(targetIp)) {
-            // IP Priority Rule: Only connect if my IP is lexicographically 'higher'
             if (myIp.compareTo(targetIp) > 0) {
                 DeviceConnection dc = new DeviceConnection(targetIp, 5000, this);
                 activeConnections.put(targetIp, dc);
-                dc.send(message);
+                return dc;
             } else {
-                uiObserver.onMessage("SYSTEM", "Waiting for " + targetIp + " to call first...");
+                uiObserver.onMessage("SYSTEM", "Waiting for " + targetIp + " to connect (Priority Rule)...");
+                return null;
             }
-        } else {
-            activeConnections.get(targetIp).send(message);
         }
+        return activeConnections.get(targetIp);
     }
 
     @Override
@@ -58,5 +67,10 @@ public class NetworkManager implements ConnectionObserver {
     public void onStatusChange(String ip, boolean online) {
         if (!online) activeConnections.remove(ip);
         uiObserver.onStatusChange(ip, online);
+    }
+
+    @Override
+    public void onFileProgress(String ip, String file, int percent) {
+        uiObserver.onFileProgress(ip, file, percent);
     }
 }
