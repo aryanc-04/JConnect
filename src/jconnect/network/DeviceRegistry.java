@@ -12,7 +12,7 @@ public class DeviceRegistry {
 
     public static List<String> getOnlineDevices() {
         long now = System.currentTimeMillis();
-        // Remove devices silent for more than 8 seconds
+       
         activeDevices.entrySet().removeIf(entry -> (now - entry.getValue() > 8000));
         return new ArrayList<>(activeDevices.keySet());
     }

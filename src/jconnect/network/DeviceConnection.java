@@ -20,12 +20,13 @@ public class DeviceConnection {
     private volatile long lastSeen = 0; 
     
     private final Object writeLock = new Object(); 
-    
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     public DeviceConnection(String remoteIp, int port, ConnectionObserver observer) {
         this.remoteIp = remoteIp;
         this.observer = observer;
+        // Immediate attempt to connect
+        attemptReconnect();
         startManager();
     }
 
@@ -39,6 +40,10 @@ public class DeviceConnection {
             handleDisconnect();
         }
         startManager();
+    }
+    
+    public boolean isConnected() {
+        return isOnline && socket != null && !socket.isClosed();
     }
 
     private void setupStreams() throws IOException {
@@ -60,38 +65,37 @@ public class DeviceConnection {
                         out.writeByte(CMD_HEARTBEAT);
                         out.flush();
                     }
-                    
-                    if (System.currentTimeMillis() - lastSeen > 20000) {
-                        handleDisconnect();
-                    }
                 } catch (IOException e) { handleDisconnect(); }
-            } else {
-                attemptReconnect();
             }
         }, 0, 2, TimeUnit.SECONDS);
     }
 
     private void attemptReconnect() {
-        if (socket != null && !socket.isClosed()) return;
+        if (socket != null && !socket.isClosed() && isOnline) return;
         try {
             socket = new Socket();
-            socket.connect(new InetSocketAddress(remoteIp, 5000), 2000);
+            socket.connect(new InetSocketAddress(remoteIp, 5000), 2000); // 2s timeout
             setupStreams();
-        } catch (IOException e) { }
+        } catch (IOException e) { 
+            // Silent fail on connect attempt, UI handles "Offline" status
+        }
+    }
+
+    // NEW: Clean shutdown method
+    public void shutdown() {
+        isOnline = false;
+        scheduler.shutdownNow();
+        try { if(socket != null) socket.close(); } catch(Exception e) {}
     }
 
     private void listen() {
         try {
             while (isOnline) {
                 byte type = in.readByte();
-                
                 lastSeen = System.currentTimeMillis();
-
                 switch (type) {
-                    case CMD_HEARTBEAT: 
-                        break;
-                    case CMD_ACK:
-                        break;
+                    case CMD_HEARTBEAT: break;
+                    case CMD_ACK: break;
                     case CMD_MSG:
                         String text = in.readUTF();
                         observer.onMessage(remoteIp, text);
@@ -113,12 +117,11 @@ public class DeviceConnection {
         File downloadDir = new File(System.getProperty("user.home"), "Downloads");
         if (!downloadDir.exists()) downloadDir.mkdirs();
         
-        File partFile = new File(downloadDir, fileName + ".part");
-        File finalFile = new File(downloadDir, fileName);
+        File finalFile = new File(downloadDir, "JC_" + System.currentTimeMillis() + "_" + fileName);
 
-        observer.onMessage(remoteIp, "Receiving: " + fileName);
+        observer.onMessage(remoteIp, "Incoming File: " + fileName);
 
-        try (FileOutputStream fos = new FileOutputStream(partFile)) {
+        try (FileOutputStream fos = new FileOutputStream(finalFile)) {
             byte[] buffer = new byte[8192]; 
             long totalRead = 0;
             int bytesRead;
@@ -127,35 +130,21 @@ public class DeviceConnection {
             while (totalRead < fileSize) {
                 int remaining = (int) Math.min(buffer.length, fileSize - totalRead);
                 bytesRead = in.read(buffer, 0, remaining);
-                
-                if (bytesRead == -1) throw new IOException("Premature End of Stream");
-
+                if (bytesRead == -1) throw new IOException("Premature End");
                 fos.write(buffer, 0, bytesRead);
                 totalRead += bytesRead;
 
-                lastSeen = System.currentTimeMillis();
-
                 if (System.currentTimeMillis() - lastAckTime > 1000) {
-                    synchronized (writeLock) {
-                        out.writeByte(CMD_ACK);
-                        out.flush();
-                    }
+                    synchronized (writeLock) { out.writeByte(CMD_ACK); out.flush(); }
                     lastAckTime = System.currentTimeMillis();
-                    
                     int percent = (int) ((totalRead * 100) / fileSize);
                     observer.onFileProgress(remoteIp, fileName, percent);
                 }
             }
             fos.flush(); 
         }
-
-        if (finalFile.exists()) finalFile.delete(); 
-        if (partFile.renameTo(finalFile)) {
-            observer.onMessage(remoteIp, "Saved: " + finalFile.getName());
-            observer.onFileProgress(remoteIp, fileName, 100);
-        } else {
-            observer.onMessage(remoteIp, "Error: Could not rename .part file");
-        }
+        observer.onMessage(remoteIp, "File Saved: " + finalFile.getAbsolutePath());
+        observer.onFileProgress(remoteIp, fileName, 100);
     }
 
     public void sendFile(File file) {
@@ -184,11 +173,10 @@ public class DeviceConnection {
                         }
                     }
                     out.flush();
-                    observer.onMessage(remoteIp, "Sent: " + file.getName());
+                    observer.onMessage(remoteIp, "Sent File: " + file.getName());
                     observer.onFileProgress(remoteIp, file.getName(), 100);
 
                 } catch (IOException e) {
-                    observer.onMessage(remoteIp, "Upload Failed: " + e.getMessage());
                     handleDisconnect();
                 }
             }

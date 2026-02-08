@@ -29,6 +29,7 @@ public class NetworkManager implements ConnectionObserver {
             while (true) {
                 Socket s = ss.accept();
                 String partnerIp = s.getInetAddress().getHostAddress();
+                
                 if (!activeConnections.containsKey(partnerIp)) {
                     activeConnections.put(partnerIp, new DeviceConnection(s, this));
                 }
@@ -36,28 +37,42 @@ public class NetworkManager implements ConnectionObserver {
         } catch (IOException e) { e.printStackTrace(); }
     }
 
+    // NEW: Explicitly connect when UI selects a device
+    public void connectTo(String targetIp) {
+        if (targetIp == null || targetIp.equals(myIp)) return;
+        
+        // Don't create if exists and is online
+        if (activeConnections.containsKey(targetIp)) {
+            DeviceConnection conn = activeConnections.get(targetIp);
+            if(conn.isConnected()) {
+                uiObserver.onStatusChange(targetIp, true);
+                return;
+            }
+        }
+
+        new Thread(() -> {
+            DeviceConnection dc = new DeviceConnection(targetIp, 5000, this);
+            activeConnections.put(targetIp, dc);
+        }).start();
+    }
+
+    // NEW: Explicitly disconnect
+    public void disconnectFrom(String targetIp) {
+        if (targetIp == null) return;
+        DeviceConnection conn = activeConnections.remove(targetIp);
+        if (conn != null) {
+            conn.shutdown();
+        }
+    }
+
     public void sendMessageTo(String targetIp, String message) {
-        DeviceConnection conn = getConnection(targetIp);
+        DeviceConnection conn = activeConnections.get(targetIp);
         if (conn != null) conn.sendText(message);
     }
     
     public void sendFileTo(String targetIp, File file) {
-        DeviceConnection conn = getConnection(targetIp);
+        DeviceConnection conn = activeConnections.get(targetIp);
         if (conn != null) conn.sendFile(file);
-    }
-
-    private DeviceConnection getConnection(String targetIp) {
-        if (!activeConnections.containsKey(targetIp)) {
-            if (myIp.compareTo(targetIp) > 0) {
-                DeviceConnection dc = new DeviceConnection(targetIp, 5000, this);
-                activeConnections.put(targetIp, dc);
-                return dc;
-            } else {
-                uiObserver.onMessage("SYSTEM", "Waiting for " + targetIp + " to connect (Priority Rule)...");
-                return null;
-            }
-        }
-        return activeConnections.get(targetIp);
     }
 
     @Override

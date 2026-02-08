@@ -43,7 +43,7 @@ public class DiscoveryService {
                 if (msg.startsWith(PROTOCOL_PREFIX) && !senderIp.equals(InetAddress.getLocalHost().getHostAddress())) {
                     DeviceRegistry.updateDevice(senderIp);
                 }
-            } catch (Exception e) { /* Closed */ }
+            } catch (Exception e) { }
         }
     }
 }
