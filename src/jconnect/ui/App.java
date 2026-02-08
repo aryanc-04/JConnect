@@ -1,7 +1,9 @@
 package jconnect.ui;
 
+import com.formdev.flatlaf.FlatDarkLaf; // Import FlatLaf
 import jconnect.network.*;
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.io.File;
 import java.util.List;
@@ -20,10 +22,14 @@ public class App extends JFrame implements ConnectionObserver {
 
     public App() {
         setTitle("JConnect P2P Messenger");
-        setSize(900, 600);
+        setSize(950, 650); // Slightly larger for modern feel
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
-        setLayout(new BorderLayout(10, 10));
+
+        // Use a container with padding for the main layout
+        JPanel mainContainer = new JPanel(new BorderLayout(15, 15));
+        mainContainer.setBorder(new EmptyBorder(15, 15, 15, 15)); // Global padding
+        setContentPane(mainContainer);
 
         networkManager = new NetworkManager(this);
         initLeftPanel();
@@ -39,6 +45,10 @@ public class App extends JFrame implements ConnectionObserver {
         deviceListModel = new DefaultListModel<>();
         deviceList = new JList<>(deviceListModel);
         deviceList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        // Modern list styling
+        deviceList.setFixedCellHeight(35);
+        deviceList.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+
         deviceList.addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
                 String ip = deviceList.getSelectedValue();
@@ -50,40 +60,64 @@ public class App extends JFrame implements ConnectionObserver {
         });
 
         JScrollPane scrollPane = new JScrollPane(deviceList);
-        scrollPane.setPreferredSize(new Dimension(200, 0));
-        scrollPane.setBorder(BorderFactory.createTitledBorder("Online Devices"));
-        add(scrollPane, BorderLayout.WEST);
+        scrollPane.setPreferredSize(new Dimension(220, 0));
+        // FlatLaf handles borders well, but TitledBorder can look dated.
+        // Let's use a Label header instead for a cleaner look.
+        JPanel sidePanel = new JPanel(new BorderLayout());
+        JLabel header = new JLabel("Online Devices");
+        header.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        header.setBorder(new EmptyBorder(0, 0, 10, 0));
+        header.setForeground(UIManager.getColor("Label.disabledForeground"));
+
+        sidePanel.add(header, BorderLayout.NORTH);
+        sidePanel.add(scrollPane, BorderLayout.CENTER);
+
+        add(sidePanel, BorderLayout.WEST);
     }
 
     private void initRightPanel() {
-        JPanel rightContainer = new JPanel(new BorderLayout(5, 5));
+        JPanel rightContainer = new JPanel(new BorderLayout(10, 10));
 
         // Top Panel: Status + Progress
         JPanel topPanel = new JPanel(new BorderLayout());
         connectionStatusLabel = new JLabel("Select a device");
-        connectionStatusLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
+        connectionStatusLabel.setFont(new Font("Segoe UI", Font.BOLD, 18)); // Larger, modern font
+
         progressBar = new JProgressBar(0, 100);
         progressBar.setStringPainted(true);
         progressBar.setVisible(false);
-        
+        // Make progress bar thinner
+        progressBar.setPreferredSize(new Dimension(100, 4));
+
         topPanel.add(connectionStatusLabel, BorderLayout.CENTER);
         topPanel.add(progressBar, BorderLayout.SOUTH);
-        topPanel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
 
         // Center Panel: Chat
         chatArea = new JTextArea();
         chatArea.setEditable(false);
         chatArea.setLineWrap(true);
+        chatArea.setWrapStyleWord(true);
+        chatArea.setFont(new Font("Segoe UI", Font.PLAIN, 15)); // Readable font
+        // Add padding inside the text area
+        chatArea.setBorder(new EmptyBorder(10, 10, 10, 10));
+
         JScrollPane chatScroll = new JScrollPane(chatArea);
+        chatScroll.setBorder(BorderFactory.createLineBorder(UIManager.getColor("Component.borderColor"))); // Subtle border
 
         // Bottom Panel: Input + File Button
         JPanel inputPanel = new JPanel(new BorderLayout(10, 0));
-        inputPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
         messageField = new JTextField();
-        JPanel buttonPanel = new JPanel(new GridLayout(1, 2, 5, 0));
+        messageField.putClientProperty("JTextField.placeholderText", "Type a message..."); // FlatLaf feature!
+        messageField.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+
+        JPanel buttonPanel = new JPanel(new GridLayout(1, 2, 8, 0));
         sendButton = new JButton("Send");
-        sendFileButton = new JButton("Attach File");
+        sendFileButton = new JButton("File");
+
+        // Make buttons slightly larger/friendlier
+        sendButton.setFocusPainted(false);
+        sendFileButton.setFocusPainted(false);
 
         buttonPanel.add(sendButton);
         buttonPanel.add(sendFileButton);
@@ -158,10 +192,9 @@ public class App extends JFrame implements ConnectionObserver {
             if (!progressBar.isVisible()) progressBar.setVisible(true);
             progressBar.setValue(percent);
             progressBar.setString(fileName + " " + percent + "%");
-            
-            // Flash window title as requested
+
             setTitle("JConnect - Transferring: " + percent + "%");
-            
+
             if (percent >= 100) {
                 new Timer(2000, e -> {
                     progressBar.setVisible(false);
@@ -173,8 +206,19 @@ public class App extends JFrame implements ConnectionObserver {
     }
 
     public static void main(String[] args) {
-        try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); }
-        catch (Exception ignored) {}
+        // 1. SETUP FLATLAF
+        try {
+            FlatDarkLaf.setup();
+
+            // Optional: Customize global settings
+            UIManager.put("Button.arc", 12);         // Rounded buttons
+            UIManager.put("Component.arc", 12);      // Rounded fields
+            UIManager.put("ProgressBar.arc", 12);    // Rounded progress bar
+            UIManager.put("ScrollBar.width", 10);    // Thinner scrollbars
+        } catch (Exception ex) {
+            System.err.println("Failed to initialize FlatLaf");
+        }
+
         SwingUtilities.invokeLater(App::new);
     }
 }
