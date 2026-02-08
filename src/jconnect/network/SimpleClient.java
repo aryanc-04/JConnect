@@ -5,7 +5,7 @@ import java.net.*;
 
 public class SimpleClient {
     public static void main(String[] args) {
-        String hostname = "192.168.X.X"; // PUT SERVER IP HERE
+        String hostname = "10.164.249.52"; // PUT SERVER IP HERE
         int port = 5000;
 
         try (Socket socket = new Socket(hostname, port)) {
