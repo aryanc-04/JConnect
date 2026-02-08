@@ -12,25 +12,27 @@ public class P2PNode implements ConnectionObserver {
     }
 
     public void start() {
-        // 1. Thread to listen for incoming connections
+        // Start Discovery
+        new DiscoveryService().start();
         new Thread(this::acceptConnections).start();
 
-        // 2. Simple Console UI
         Scanner scanner = new Scanner(System.in);
         while (true) {
-            System.out.println("\n1. Add Device (IP) | 2. Send Message | 3. Exit");
+            List<String> online = DeviceRegistry.getOnlineDevices();
+            System.out.println("\n--- DISCOVERED DEVICES ---");
+            for (int i = 0; i < online.size(); i++) {
+                System.out.println((i + 1) + ". " + online.get(i));
+            }
+            System.out.println("0. Refresh | 9. Send to All");
+
             int choice = scanner.nextInt();
             scanner.nextLine();
 
-            if (choice == 1) {
-                System.out.print("Enter IP: ");
-                String ip = scanner.nextLine();
-                connections.add(new DeviceConnection(ip, 5000, this));
-            } else if (choice == 2) {
-                System.out.print("Message: ");
-                String msg = scanner.nextLine();
-                // Send to all online devices
-                for (DeviceConnection dc : connections) dc.send(msg);
+            if (choice > 0 && choice <= online.size()) {
+                String targetIp = online.get(choice - 1);
+                // Here you would find or create a DeviceConnection for targetIp
+                System.out.println("Connecting to " + targetIp + "...");
+                // Logic to send message specifically to this IP
             }
         }
     }
